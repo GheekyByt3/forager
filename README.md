@@ -1,10 +1,6 @@
 # Forager
 
-> Automated network enumeration tool for pentesters
-
-> **Noisy by design. For Authorized Pentests only.**
-
-> Created with <3 by Prithvi Chintha
+![Help](assets/forager_help.png)
 
 Forager automates the full internal recon workflow — from resolving domain controllers to web screenshots and SMB enumeration — in a single, phase-controlled pipeline.
 
@@ -12,17 +8,13 @@ Recommended for **non-stealth engagements** only. This tool generates significan
 
 ---
 
-## Demo
+## Installation
 
-<!-- Add a terminal recording or animated GIF here (e.g. via asciinema or vhs) -->
-> *Demo coming soon*
-
----
-
-## Screenshots
-
-<!-- Add screenshots of the banner, phase selection prompt, and final summary here -->
-> *Screenshots coming soon*
+```bash
+git clone https://github.com/GheekyByt3/forager.git
+cd forager
+pip install -r requirements.txt
+```
 
 ---
 
@@ -58,16 +50,6 @@ Recommended for **non-stealth engagements** only. This tool generates significan
 Install Python dependencies:
 
 ```bash
-pip install -r requirements.txt
-```
-
----
-
-## Installation
-
-```bash
-git clone https://github.com/GheekyByt3/forager.git
-cd forager
 pip install -r requirements.txt
 ```
 
@@ -210,7 +192,7 @@ forager_corp.local/
     ├── smb_signing_disabled_hosts.txt
     ├── smb_relay_targets.txt         # smb://IP format
     ├── smbv1_enabled_hosts.txt
-    └── Windows_Server_2019_hosts.txt # Dynamic per OS version found
+    └── Windows_<version>_hosts.txt   # One file per OS version detected
 ```
 
 ---

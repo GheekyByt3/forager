@@ -849,7 +849,11 @@ def main():
             #
             f"\n  {C.BOLD}{C.WHITE}Output control:{C.RESET}\n\n"
             f"    {C.DIM}# Force a fresh timestamped directory{C.RESET}\n"
-            f"    {C.CYAN}python3 {prog}{C.RESET} corp.local {C.CYAN}--full-scan{C.RESET} {C.CYAN}--new{C.RESET}\n"
+            f"    {C.CYAN}python3 {prog}{C.RESET} corp.local {C.CYAN}--full-scan{C.RESET} {C.CYAN}--new{C.RESET}\n\n"
+            f"    {C.DIM}# Use a custom output directory{C.RESET}\n"
+            f"    {C.CYAN}python3 {prog}{C.RESET} corp.local {C.CYAN}--output{C.RESET} /tmp/myrecon\n\n"
+            f"    {C.DIM}# Suppress verbose output{C.RESET}\n"
+            f"    {C.CYAN}python3 {prog}{C.RESET} corp.local {C.CYAN}--full-scan{C.RESET} {C.CYAN}-q{C.RESET}\n"
         ),
     )
 
