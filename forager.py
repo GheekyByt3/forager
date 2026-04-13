@@ -532,13 +532,17 @@ def phase6_web_screenshots(output_dir):
     gowitness_cmd = (
         f"gowitness scan file -f {url_file} "
         f"--screenshot-path {screenshot_path} "
-        f"--db-uri {db_uri}"
+        f"--write-db --write-db-uri {db_uri}"
     )
-    run(gowitness_cmd, capture=False)
+    try:
+        run(gowitness_cmd, capture=False)
+    except subprocess.CalledProcessError as e:
+        log(f"gowitness scan failed (exit {e.returncode}) — continuing", "warn")
+        return None
 
     log(f"Screenshots saved to {screenshot_path}", "ok")
     log(f"To browse results, run:", "info")
-    log(f"  gowitness server --db-uri {db_uri} --screenshot-path {screenshot_path.resolve()}", "info")
+    log(f"  gowitness report server --db-uri {db_uri}", "info")
 
     return {"screenshot_urls": len(urls)}
 
@@ -671,8 +675,11 @@ def run_snmp_scan(output_dir):
         f"nmap -p 161,162 --open -sU -v -Pn "
         f"-iL {live_hosts_file} -oA {scan_base}"
     )
-    run(nmap_cmd, capture=False)
-    log("SNMP scan complete", "ok")
+    try:
+        run(nmap_cmd, capture=False)
+        log("SNMP scan complete", "ok")
+    except subprocess.CalledProcessError as e:
+        log(f"SNMP scan failed (exit {e.returncode}) — continuing", "warn")
 
 
 def run_ipmi_scan(output_dir):
@@ -692,8 +699,11 @@ def run_ipmi_scan(output_dir):
         f"nmap -sU -p 623 -Pn --open --script ipmi-version "
         f"-iL {live_hosts_file} -oA {scan_base}"
     )
-    run(nmap_cmd, capture=False)
-    log("IPMI scan complete", "ok")
+    try:
+        run(nmap_cmd, capture=False)
+        log("IPMI scan complete", "ok")
+    except subprocess.CalledProcessError as e:
+        log(f"IPMI scan failed (exit {e.returncode}) — continuing", "warn")
 
 
 def run_screenshots_scan(output_dir):
@@ -719,13 +729,17 @@ def run_screenshots_scan(output_dir):
     gowitness_cmd = (
         f"gowitness scan file -f {live_hosts_file} "
         f"--screenshot-path {screenshot_path} "
-        f"--db-uri {db_uri}"
+        f"--write-db --write-db-uri {db_uri}"
     )
-    run(gowitness_cmd, capture=False)
+    try:
+        run(gowitness_cmd, capture=False)
+    except subprocess.CalledProcessError as e:
+        log(f"gowitness scan failed (exit {e.returncode}) — continuing", "warn")
+        return
 
     log(f"Screenshots saved to {screenshot_path}", "ok")
     log(f"To browse results, run:", "info")
-    log(f"  gowitness server --db-uri {db_uri} --screenshot-path {screenshot_path.resolve()}", "info")
+    log(f"  gowitness report server --db-uri {db_uri}", "info")
 
 
 # ─── Interactive prompt ─────────────────────────────────────────
@@ -983,6 +997,12 @@ def main():
         parser.error("--dc-ips cannot be combined with --subnets or --live-hosts")
     if args.screenshots and not args.live_hosts:
         parser.error("--screenshots requires --live-hosts")
+    if args.screenshots and args.full_scan:
+        parser.error("--screenshots cannot be combined with --full-scan (quick screenshot mode runs no phases)")
+    if args.screenshots and (args.start_phase or args.stop_phase):
+        parser.error("--screenshots cannot be combined with --start-phase or --stop-phase")
+    if args.screenshots and args.skip_gowitness:
+        parser.error("--screenshots and --skip-gowitness are contradictory")
 
     # --- Validate input files early ---
     validate_input_files(args)
@@ -1005,8 +1025,8 @@ def main():
     # Implicit start phase based on input shortcuts
     implicit_start = 3 if args.subnets else 4 if args.live_hosts else 1
 
-    if addl_only:
-        start_phase, stop_phase = 0, 0  # no phases, just additional scans
+    if addl_only or args.screenshots:
+        start_phase, stop_phase = 0, 0  # no phases, just additional scans / screenshots
     elif args.resume:
         start_phase, stop_phase = 1, MAX_PHASE  # overridden below by resume logic
     elif args.full_scan:
@@ -1137,13 +1157,15 @@ def main():
 
         print(f"{C.BOLD}{C.BLUE}{'─'*60}{C.RESET}")
         print(f"  {C.BOLD}Target :{C.RESET} {C.WHITE}{args.domain or 'custom targets'}{C.RESET}")
-        if addl_only:
-            addl_labels = []
+        if addl_only or args.screenshots:
+            scan_labels = []
+            if args.screenshots:
+                scan_labels.append("Screenshots")
             if args.snmp:
-                addl_labels.append("SNMP")
+                scan_labels.append("SNMP")
             if args.ipmi:
-                addl_labels.append("IPMI")
-            print(f"  {C.BOLD}Scans  :{C.RESET} {C.WHITE}{', '.join(addl_labels)}{C.RESET}")
+                scan_labels.append("IPMI")
+            print(f"  {C.BOLD}Scans  :{C.RESET} {C.WHITE}{', '.join(scan_labels)}{C.RESET}")
         else:
             print(f"  {C.BOLD}Phases :{C.RESET} {C.WHITE}{start_phase} -> {stop_phase}{C.RESET}")
         print(f"  {C.BOLD}Started:{C.RESET} {C.WHITE}{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}{C.RESET}")
