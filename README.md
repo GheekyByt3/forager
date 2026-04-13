@@ -132,6 +132,9 @@ python3 forager.py corp.local --full-scan --new
 
 # Use a custom output directory
 python3 forager.py corp.local --output /tmp/myrecon
+
+# Suppress verbose output
+python3 forager.py corp.local --full-scan -q
 ```
 
 ---
