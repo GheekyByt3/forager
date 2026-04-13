@@ -395,7 +395,7 @@ def phase4_port_scan(output_dir, ports=None, max_retries=5):
     nmap_dir = output_dir / "nmap_scans"
     nmap_dir.mkdir(exist_ok=True)
 
-    scan_base = nmap_dir / "reachable_intranet_subnets_limited_scan"
+    scan_base = nmap_dir / "port_scan"
     ports = ports or TARGET_PORTS
 
     host_count = len(live_hosts_file.read_text().strip().splitlines())
@@ -415,7 +415,7 @@ def phase5_parse_results(output_dir):
     """Parse nmap results into categorized host files."""
     log(f"{C.BOLD}Phase 5:{C.RESET} Parsing scan results")
 
-    nmap_file = output_dir / "nmap_scans" / "reachable_intranet_subnets_limited_scan.nmap"
+    nmap_file = output_dir / "nmap_scans" / "port_scan.nmap"
     results_dir = output_dir / "parsed_results"
     results_dir.mkdir(exist_ok=True)
 
@@ -1097,7 +1097,7 @@ def main():
             4: (output_dir / "live_hosts.txt",
                 f"Starting at phase 4 requires live_hosts.txt to exist in {output_dir}",
                 "Run from an earlier phase first, or provide hosts with --live-hosts"),
-            5: (output_dir / "nmap_scans" / "reachable_intranet_subnets_limited_scan.nmap",
+            5: (output_dir / "nmap_scans" / "port_scan.nmap",
                 f"Starting at phase 5 requires a completed nmap scan in {output_dir}/nmap_scans/",
                 "Run from phase 4 first to generate the scan output"),
             6: (output_dir / "parsed_results" / "full_summary.csv",

@@ -171,9 +171,9 @@ forager_corp.local/
 ├── ping_sweep.gnmap                  # Raw nmap ping sweep output
 ├── .forager_state.json               # State file for --resume
 ├── nmap_scans/
-│   ├── reachable_intranet_subnets_limited_scan.nmap
-│   ├── reachable_intranet_subnets_limited_scan.xml
-│   ├── reachable_intranet_subnets_limited_scan.gnmap
+│   ├── port_scan.nmap
+│   ├── port_scan.xml
+│   ├── port_scan.gnmap
 │   ├── snmp_scan.*                   # Only if --snmp was used
 │   └── ipmi_hosts_scan.*            # Only if --ipmi was used
 ├── parsed_results/
