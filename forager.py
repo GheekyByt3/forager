@@ -127,7 +127,7 @@ def print_banner():
     print(f"  {C.ORANGE}{C.BOLD}[ ! ]{C.RESET}  Noisy by design. For Authorized Pentests only.\n")
 
 
-def log(msg, level="info", hint=None):
+def log(msg, level="info", hint=None, indent=0):
     styles = {
         "info": (f"{C.CYAN}[*]{C.RESET}", ""),
         "ok":   (f"{C.GREEN}[+]{C.RESET}", C.GREEN),
@@ -135,6 +135,7 @@ def log(msg, level="info", hint=None):
         "err":  (f"{C.RED}[-]{C.RESET}",   C.RED),
     }
     prefix, color = styles.get(level, styles["info"])
+    pad = "    " * indent
     if level == "err":
         print(f"\n  {C.RED}{C.BOLD}[ ERROR ]{C.RESET}  {C.RED}{msg}{C.RESET}")
         if hint:
@@ -143,7 +144,29 @@ def log(msg, level="info", hint=None):
     elif QUIET and level == "info":
         pass  # suppress verbose info in quiet mode
     else:
-        print(f"{prefix} {color}{msg}{C.RESET}")
+        print(f"{pad}{prefix} {color}{msg}{C.RESET}")
+
+
+def phase_header(num, title):
+    """Print a boxed phase header with divider."""
+    print()
+    print(f"{C.BOLD}{C.CYAN}┌─ Phase {num}: {title} {'─' * max(2, 50 - len(title))}{C.RESET}")
+
+
+def phase_footer(num, elapsed):
+    """Print a phase completion footer."""
+    print(f"{C.BOLD}{C.CYAN}└─ Phase {num} complete{C.RESET} {C.DIM}({fmt_duration(elapsed)}){C.RESET}")
+
+
+def section_header(title):
+    """Print a boxed section header (for non-phase operations like additional scans)."""
+    print()
+    print(f"{C.BOLD}{C.MAGENTA}┌─ {title} {'─' * max(2, 55 - len(title))}{C.RESET}")
+
+
+def section_footer(title, elapsed):
+    """Print a section completion footer."""
+    print(f"{C.BOLD}{C.MAGENTA}└─ {title} complete{C.RESET} {C.DIM}({fmt_duration(elapsed)}){C.RESET}")
 
 
 def run(cmd, shell=True, check=True, capture=True):
@@ -258,7 +281,7 @@ def validate_input_files(args):
 
 def phase1_resolve_dcs(domain, output_dir):
     """Resolve Domain Controller IPs via DNS SRV records."""
-    log(f"{C.BOLD}Phase 1:{C.RESET} Resolving domain controllers for {C.CYAN}{domain}{C.RESET}")
+    phase_header(1, f"Resolve DCs for {domain}")
 
     dc_ips_file = output_dir / "DC_IPs.txt"
     srv_query = f"_ldap._tcp.dc._msdcs.{domain}"
@@ -316,12 +339,12 @@ def phase1_resolve_dcs(domain, output_dir):
                     try:
                         ipaddress.ip_address(candidate)
                         ips.append(candidate)
-                        log(f"  {hostname} -> {candidate}", "ok")
+                        log(f"{hostname} -> {candidate}", "ok", indent=1)
                         break
                     except ValueError:
                         continue
         else:
-            log(f"  Could not resolve IP for {hostname}", "warn")
+            log(f"Could not resolve IP for {hostname}", "warn", indent=1)
 
     if not ips:
         log("No DC IPs resolved. Check domain name and DNS config", "err")
@@ -335,7 +358,7 @@ def phase1_resolve_dcs(domain, output_dir):
 
 def phase2_build_subnets(dc_ips, subnet_mask, output_dir):
     """Build subnet list from DC IPs."""
-    log(f"{C.BOLD}Phase 2:{C.RESET} Building /{subnet_mask} subnets from DC IPs")
+    phase_header(2, f"Build /{subnet_mask} subnets from DC IPs")
 
     subnets_file = output_dir / "DC_subnets.txt"
     subnets = set()
@@ -355,7 +378,7 @@ def phase2_build_subnets(dc_ips, subnet_mask, output_dir):
 
 def phase3_ping_sweep(output_dir, parallelism=100, rate=None):
     """Fast ping sweep to find live hosts."""
-    log(f"{C.BOLD}Phase 3:{C.RESET} Ping sweep for live hosts")
+    phase_header(3, "Ping sweep for live hosts")
 
     subnets_file = output_dir / "DC_subnets.txt"
     ping_output = output_dir / "ping_sweep.gnmap"
@@ -389,7 +412,7 @@ def phase3_ping_sweep(output_dir, parallelism=100, rate=None):
 
 def phase4_port_scan(output_dir, ports=None, max_retries=5):
     """Targeted port scan against live hosts."""
-    log(f"{C.BOLD}Phase 4:{C.RESET} Port scanning live hosts")
+    phase_header(4, "Port scan live hosts")
 
     live_hosts_file = output_dir / "live_hosts.txt"
     nmap_dir = output_dir / "nmap_scans"
@@ -413,7 +436,7 @@ def phase4_port_scan(output_dir, ports=None, max_retries=5):
 
 def phase5_parse_results(output_dir):
     """Parse nmap results into categorized host files."""
-    log(f"{C.BOLD}Phase 5:{C.RESET} Parsing scan results")
+    phase_header(5, "Parse scan results")
 
     nmap_file = output_dir / "nmap_scans" / "port_scan.nmap"
     results_dir = output_dir / "parsed_results"
@@ -458,14 +481,14 @@ def phase5_parse_results(output_dir):
             if any(p in cat_ports for p in open_ports):
                 label = f"{ip}"
                 if info["hostname"]:
-                    label = f"{ip} ({info['hostname']})"
+                    label = f"{ip} ({info['hostname'].upper()})"
                 categorized[category].append(label)
 
     for category, host_list in categorized.items():
         if host_list:
             out_file = results_dir / f"{category}_hosts.txt"
             out_file.write_text("\n".join(sorted(host_list)) + "\n")
-            log(f"  {category}: {len(host_list)} host(s) -> {out_file.name}", "ok")
+            log(f"{category}: {len(host_list)} host(s) -> {out_file.name}", "ok", indent=1)
 
     summary_file = results_dir / "full_summary.csv"
     with open(summary_file, "w", newline="") as f:
@@ -476,14 +499,14 @@ def phase5_parse_results(output_dir):
                 writer.writerow([ip, info["hostname"] or "", p["port"], p["service"], p["version"]])
 
     total_ports = sum(len(info["ports"]) for info in hosts.values())
-    log(f"Full summary: {summary_file}", "ok")
+    log(f"Full summary -> parsed_results/{summary_file.name}", "ok")
     log(f"Total hosts with open ports: {len(hosts)}", "ok")
     return {"hosts_with_open_ports": len(hosts), "total_open_ports": total_ports}
 
 
 def phase6_web_screenshots(output_dir):
     """Capture web screenshots via gowitness v3."""
-    log(f"{C.BOLD}Phase 6:{C.RESET} Web screenshots via gowitness")
+    phase_header(6, "Web screenshots via gowitness")
 
     if not shutil.which("gowitness"):
         log("gowitness not found — skipping screenshots (install gowitness to enable this phase)", "warn")
@@ -540,7 +563,7 @@ def phase6_web_screenshots(output_dir):
         log(f"gowitness scan failed (exit {e.returncode}) — continuing", "warn")
         return None
 
-    log(f"Screenshots saved to {screenshot_path}", "ok")
+    log(f"Screenshots saved -> gowitness_results/screenshots/", "ok")
     log(f"To browse results, run:", "info")
     log(f"  gowitness report server --db-uri {db_uri}", "info")
 
@@ -549,7 +572,7 @@ def phase6_web_screenshots(output_dir):
 
 def phase7_smb_enum(output_dir):
     """Run nxc smb against live hosts and parse results."""
-    log(f"{C.BOLD}Phase 7:{C.RESET} SMB enumeration via NetExec")
+    phase_header(7, "SMB enumeration via NetExec")
 
     live_hosts_file = output_dir / "live_hosts.txt"
     if not live_hosts_file.exists():
@@ -565,7 +588,7 @@ def phase7_smb_enum(output_dir):
     raw = run(nxc_cmd, check=False)
 
     raw_output_file.write_text(raw + "\n")
-    log(f"Raw output saved: {raw_output_file.name}", "ok")
+    log(f"Raw output saved -> nxc_smb_parsed_results/{raw_output_file.name}", "ok")
 
     signing_disabled = []
     relay_targets = []
@@ -598,16 +621,19 @@ def phase7_smb_enum(output_dir):
         if name_match:
             hostname = name_match.group(1)
         else:
-            hostname = parts[3] if len(parts) > 3 else ip
+            hostname = parts[3] if len(parts) > 3 else None
+
+        # Consistent format: "IP (HOSTNAME)" with uppercase hostname, or just "IP"
+        label = f"{ip} ({hostname.upper()})" if hostname and hostname != ip else ip
 
         signing_match = re.search(r'\(signing:(True|False)\)', line)
         if signing_match and signing_match.group(1) == "False":
-            signing_disabled.append(f"{hostname} {ip}")
+            signing_disabled.append(label)
             relay_targets.append(f"smb://{ip}")
 
         smbv1_match = re.search(r'\(SMBv1:(True|False)\)', line)
         if smbv1_match and smbv1_match.group(1) == "True":
-            smbv1_enabled.append(f"{hostname} {ip}")
+            smbv1_enabled.append(label)
 
         os_match = re.search(r'Windows\s+(Server\s+\d+|[\d.]+)', line, re.IGNORECASE)
         if os_match:
@@ -615,7 +641,7 @@ def phase7_smb_enum(output_dir):
             os_key = os_ver.replace(" ", "_")
             if os_key not in os_hosts:
                 os_hosts[os_key] = []
-            os_hosts[os_key].append(f"{hostname} {ip}")
+            os_hosts[os_key].append(label)
 
     files_written = 0
     smb_stats = {}
@@ -624,7 +650,7 @@ def phase7_smb_enum(output_dir):
         f = smb_dir / "smb_signing_disabled_hosts.txt"
         f.write_text("\n".join(sorted(set(signing_disabled))) + "\n")
         count = len(set(signing_disabled))
-        log(f"  SMB signing disabled: {count} host(s) -> {f.name}", "ok")
+        log(f"SMB signing disabled: {count} host(s) -> {f.name}", "ok", indent=1)
         smb_stats["signing_disabled"] = count
         files_written += 1
 
@@ -632,7 +658,7 @@ def phase7_smb_enum(output_dir):
         f = smb_dir / "smb_relay_targets.txt"
         f.write_text("\n".join(sorted(set(relay_targets))) + "\n")
         count = len(set(relay_targets))
-        log(f"  SMB relay targets: {count} host(s) -> {f.name}", "ok")
+        log(f"SMB relay targets: {count} host(s) -> {f.name}", "ok", indent=1)
         smb_stats["relay_targets"] = count
         files_written += 1
 
@@ -640,14 +666,14 @@ def phase7_smb_enum(output_dir):
         f = smb_dir / "smbv1_enabled_hosts.txt"
         f.write_text("\n".join(sorted(set(smbv1_enabled))) + "\n")
         count = len(set(smbv1_enabled))
-        log(f"  SMBv1 enabled: {count} host(s) -> {f.name}", "ok")
+        log(f"SMBv1 enabled: {count} host(s) -> {f.name}", "ok", indent=1)
         smb_stats["smbv1_enabled"] = count
         files_written += 1
 
     for os_key, hosts in sorted(os_hosts.items()):
         f = smb_dir / f"{os_key}_hosts.txt"
         f.write_text("\n".join(sorted(set(hosts))) + "\n")
-        log(f"  {os_key.replace('_', ' ')}: {len(set(hosts))} host(s) -> {f.name}", "ok")
+        log(f"{os_key.replace('_', ' ')}: {len(set(hosts))} host(s) -> {f.name}", "ok", indent=1)
         files_written += 1
 
     if files_written == 0:
@@ -658,9 +684,30 @@ def phase7_smb_enum(output_dir):
     return smb_stats
 
 
+def parse_gnmap_hosts(gnmap_file):
+    """Parse an nmap .gnmap file and return a sorted list of 'IP (HOSTNAME)' entries
+    for hosts with at least one open port. Hostname is uppercased."""
+    if not gnmap_file.exists():
+        return []
+    entries = set()
+    for line in gnmap_file.read_text().splitlines():
+        if not line.startswith("Host:") or "Ports:" not in line:
+            continue
+        if "/open/" not in line:
+            continue
+        # Format: "Host: 10.0.1.15 (hostname.corp.local) Ports: ..."
+        m = re.match(r"Host:\s+(\S+)\s+\(([^)]*)\)", line)
+        if not m:
+            continue
+        ip, hostname = m.group(1), m.group(2).strip()
+        label = f"{ip} ({hostname.upper()})" if hostname else ip
+        entries.add(label)
+    return sorted(entries)
+
+
 def run_snmp_scan(output_dir):
     """Run UDP SNMP scan against live hosts."""
-    log(f"{C.BOLD}SNMP scan:{C.RESET} UDP port 161/162")
+    section_header("SNMP scan (UDP 161/162)")
 
     live_hosts_file = output_dir / "live_hosts.txt"
     if not live_hosts_file.exists():
@@ -677,14 +724,23 @@ def run_snmp_scan(output_dir):
     )
     try:
         run(nmap_cmd, capture=False)
-        log("SNMP scan complete", "ok")
     except subprocess.CalledProcessError as e:
         log(f"SNMP scan failed (exit {e.returncode}) — continuing", "warn")
+        return
+
+    # Parse results into IP (HOSTNAME) list
+    hosts = parse_gnmap_hosts(Path(f"{scan_base}.gnmap"))
+    if hosts:
+        results_dir = output_dir / "parsed_results"
+        results_dir.mkdir(exist_ok=True)
+        out_file = results_dir / "snmp_hosts.txt"
+        out_file.write_text("\n".join(hosts) + "\n")
+        log(f"snmp: {len(hosts)} host(s) -> {out_file.name}", "ok", indent=1)
 
 
 def run_ipmi_scan(output_dir):
     """Run UDP IPMI scan against live hosts."""
-    log(f"{C.BOLD}IPMI scan:{C.RESET} UDP port 623")
+    section_header("IPMI scan (UDP 623)")
 
     live_hosts_file = output_dir / "live_hosts.txt"
     if not live_hosts_file.exists():
@@ -701,14 +757,23 @@ def run_ipmi_scan(output_dir):
     )
     try:
         run(nmap_cmd, capture=False)
-        log("IPMI scan complete", "ok")
     except subprocess.CalledProcessError as e:
         log(f"IPMI scan failed (exit {e.returncode}) — continuing", "warn")
+        return
+
+    # Parse results into IP (HOSTNAME) list
+    hosts = parse_gnmap_hosts(Path(f"{scan_base}.gnmap"))
+    if hosts:
+        results_dir = output_dir / "parsed_results"
+        results_dir.mkdir(exist_ok=True)
+        out_file = results_dir / "ipmi_hosts.txt"
+        out_file.write_text("\n".join(hosts) + "\n")
+        log(f"ipmi: {len(hosts)} host(s) -> {out_file.name}", "ok", indent=1)
 
 
 def run_screenshots_scan(output_dir):
     """Run gowitness directly against live hosts (no parsed results needed)."""
-    log(f"{C.BOLD}Screenshots scan:{C.RESET} gowitness against live hosts")
+    section_header("Screenshots scan (gowitness)")
 
     if not shutil.which("gowitness"):
         log("gowitness not found — install gowitness to use --screenshots", "err")
@@ -737,7 +802,7 @@ def run_screenshots_scan(output_dir):
         log(f"gowitness scan failed (exit {e.returncode}) — continuing", "warn")
         return
 
-    log(f"Screenshots saved to {screenshot_path}", "ok")
+    log(f"Screenshots saved -> gowitness_results/screenshots/", "ok")
     log(f"To browse results, run:", "info")
     log(f"  gowitness report server --db-uri {db_uri}", "info")
 
@@ -1209,7 +1274,7 @@ def main():
             elapsed = time.time() - t
             run_stats["timings"]["Phase 1"] = elapsed
             run_stats["phases_run"].append(1)
-            log(f"Phase 1 complete ({fmt_duration(elapsed)})", "ok")
+            phase_footer(1, elapsed)
         else:
             if args.dc_ips:
                 dc_ips = load_dc_ips(args, output_dir)
@@ -1225,7 +1290,7 @@ def main():
             elapsed = time.time() - t
             run_stats["timings"]["Phase 2"] = elapsed
             run_stats["phases_run"].append(2)
-            log(f"Phase 2 complete ({fmt_duration(elapsed)})", "ok")
+            phase_footer(2, elapsed)
 
         # Phase 3: Ping sweep
         if start_phase <= 3 <= stop_phase:
@@ -1235,7 +1300,7 @@ def main():
             elapsed = time.time() - t
             run_stats["timings"]["Phase 3"] = elapsed
             run_stats["phases_run"].append(3)
-            log(f"Phase 3 complete ({fmt_duration(elapsed)})", "ok")
+            phase_footer(3, elapsed)
             if not live:
                 stop_phase = 3  # skip remaining phases
 
@@ -1247,7 +1312,7 @@ def main():
             elapsed = time.time() - t
             run_stats["timings"]["Phase 4"] = elapsed
             run_stats["phases_run"].append(4)
-            log(f"Phase 4 complete ({fmt_duration(elapsed)})", "ok")
+            phase_footer(4, elapsed)
 
         # Phase 5: Parse results
         if start_phase <= 5 <= stop_phase:
@@ -1259,7 +1324,7 @@ def main():
             run_stats["phases_run"].append(5)
             if p5_stats:
                 run_stats.update(p5_stats)
-            log(f"Phase 5 complete ({fmt_duration(elapsed)})", "ok")
+            phase_footer(5, elapsed)
 
         # Phase 6: Web screenshots
         if start_phase <= 6 <= stop_phase:
@@ -1275,7 +1340,7 @@ def main():
                 run_stats["phases_run"].append(6)
                 if gw_stats:
                     run_stats.update(gw_stats)
-                log(f"Phase 6 complete ({fmt_duration(elapsed)})", "ok")
+                phase_footer(6, elapsed)
 
         # Phase 7: SMB enumeration
         if start_phase <= 7 <= stop_phase:
@@ -1287,7 +1352,7 @@ def main():
             run_stats["phases_run"].append(7)
             if smb_stats:
                 run_stats.update(smb_stats)
-            log(f"Phase 7 complete ({fmt_duration(elapsed)})", "ok")
+            phase_footer(7, elapsed)
 
         # --- Additional scans ---
         if args.screenshots:
@@ -1295,21 +1360,21 @@ def main():
             run_screenshots_scan(output_dir)
             elapsed = time.time() - t
             run_stats["timings"]["Screenshots scan"] = elapsed
-            log(f"Screenshots scan complete ({fmt_duration(elapsed)})", "ok")
+            section_footer("Screenshots scan", elapsed)
 
         if args.snmp:
             t = time.time()
             run_snmp_scan(output_dir)
             elapsed = time.time() - t
             run_stats["timings"]["SNMP scan"] = elapsed
-            log(f"SNMP scan complete ({fmt_duration(elapsed)})", "ok")
+            section_footer("SNMP scan", elapsed)
 
         if args.ipmi:
             t = time.time()
             run_ipmi_scan(output_dir)
             elapsed = time.time() - t
             run_stats["timings"]["IPMI scan"] = elapsed
-            log(f"IPMI scan complete ({fmt_duration(elapsed)})", "ok")
+            section_footer("IPMI scan", elapsed)
 
         # --- Summary ---
         total_elapsed = time.time() - total_start

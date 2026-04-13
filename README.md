@@ -185,6 +185,8 @@ forager_corp.local/
 │   ├── winrm_hosts.txt
 │   ├── ldap_hosts.txt
 │   ├── redis_hosts.txt
+│   ├── snmp_hosts.txt                # Only if --snmp was used
+│   ├── ipmi_hosts.txt                # Only if --ipmi was used
 │   └── ...
 ├── gowitness_results/                # Only if phase 6 or --screenshots ran
 │   ├── target_urls.txt               # Phase 6: URLs built from parsed results
