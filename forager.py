@@ -24,7 +24,7 @@ Usage:
     python3 forager.py -h                      # full help
 """
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 
 import argparse
 import csv
@@ -954,6 +954,11 @@ def main():
     output_group.add_argument(
         "-q", "--quiet", action="store_true",
         help="Suppress verbose output (command echoes, info messages)"
+    )
+    output_group.add_argument(
+        "-V", "--version", action="version",
+        version=f"Forager {VERSION}",
+        help="Show version number and exit"
     )
 
     print_banner()
