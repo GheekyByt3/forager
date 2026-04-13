@@ -209,12 +209,15 @@ def check_dependencies(start_phase=1, stop_phase=MAX_PHASE, snmp=False, ipmi=Fal
         if not shutil.which(tool):
             log(f"Required tool not found: {tool}", "err")
             sys.exit(1)
-    if required:
-        log(f"Dependencies found: {', '.join(required)}", "ok")
     # Soft check: gowitness is optional for phase 6 — warn but don't exit
     if start_phase <= 6 <= stop_phase and not skip_gowitness:
-        if not shutil.which("gowitness"):
+        if shutil.which("gowitness"):
+            if "gowitness" not in required:
+                required.append("gowitness")
+        else:
             log("gowitness not found — phase 6 (web screenshots) will be skipped", "warn")
+    if required:
+        log(f"Dependencies found: {', '.join(required)}", "ok")
 
 
 def load_dc_ips(args, output_dir):
