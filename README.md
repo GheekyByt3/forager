@@ -226,6 +226,7 @@ scan options:
   --min-rate            Nmap min-rate for ping sweep
   --ports               Custom port list
   --max-retries         Nmap max-retries for port scan (default: 5)
+  --screenshot-delay    Gowitness delay (seconds) between page load and screenshot (default: 5)
 
 additional scans:
   --snmp                Run SNMP UDP scan (ports 161/162)

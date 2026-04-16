@@ -504,7 +504,7 @@ def phase5_parse_results(output_dir):
     return {"hosts_with_open_ports": len(hosts), "total_open_ports": total_ports}
 
 
-def phase6_web_screenshots(output_dir):
+def phase6_web_screenshots(output_dir, delay=5):
     """Capture web screenshots via gowitness v3."""
     phase_header(6, "Web screenshots via gowitness")
 
@@ -555,6 +555,7 @@ def phase6_web_screenshots(output_dir):
     gowitness_cmd = (
         f"gowitness scan file -f {url_file} "
         f"--screenshot-path {screenshot_path} "
+        f"--delay {delay} "
         f"--write-db --write-db-uri {db_uri}"
     )
     try:
@@ -635,9 +636,16 @@ def phase7_smb_enum(output_dir):
         if smbv1_match and smbv1_match.group(1) == "True":
             smbv1_enabled.append(label)
 
-        os_match = re.search(r'Windows\s+(Server\s+\d+|[\d.]+)', line, re.IGNORECASE)
-        if os_match:
-            os_ver = os_match.group(0).strip()
+        # Prefer "Server XXXX" over "Windows XX" since nxc reports both
+        # (e.g. "Windows 10 / Server 2019") and Server is more useful for pentesters
+        server_match = re.search(r'Server\s+\d+', line, re.IGNORECASE)
+        if server_match:
+            os_ver = f"Windows {server_match.group(0).strip()}"
+        else:
+            client_match = re.search(r'Windows\s+(?:XP|\d+)', line, re.IGNORECASE)
+            os_ver = client_match.group(0).strip() if client_match else None
+
+        if os_ver:
             os_key = os_ver.replace(" ", "_")
             if os_key not in os_hosts:
                 os_hosts[os_key] = []
@@ -771,7 +779,7 @@ def run_ipmi_scan(output_dir):
         log(f"ipmi: {len(hosts)} host(s) -> {out_file.name}", "ok", indent=1)
 
 
-def run_screenshots_scan(output_dir):
+def run_screenshots_scan(output_dir, delay=5):
     """Run gowitness directly against live hosts (no parsed results needed)."""
     section_header("Screenshots scan (gowitness)")
 
@@ -794,6 +802,7 @@ def run_screenshots_scan(output_dir):
     gowitness_cmd = (
         f"gowitness scan file -f {live_hosts_file} "
         f"--screenshot-path {screenshot_path} "
+        f"--delay {delay} "
         f"--write-db --write-db-uri {db_uri}"
     )
     try:
@@ -1003,6 +1012,10 @@ def main():
     scan_group.add_argument(
         "--max-retries", type=int, default=5,
         help="Nmap max-retries for port scan (default: 5)"
+    )
+    scan_group.add_argument(
+        "--screenshot-delay", type=int, default=5,
+        help="Gowitness delay (seconds) between page load and screenshot (default: 5)"
     )
 
     # --- Additional scans (independent of phases) ---
@@ -1333,7 +1346,7 @@ def main():
                 save_state(output_dir, 6, args.domain)
             else:
                 t = time.time()
-                gw_stats = phase6_web_screenshots(output_dir)
+                gw_stats = phase6_web_screenshots(output_dir, args.screenshot_delay)
                 save_state(output_dir, 6, args.domain)
                 elapsed = time.time() - t
                 run_stats["timings"]["Phase 6"] = elapsed
@@ -1357,7 +1370,7 @@ def main():
         # --- Additional scans ---
         if args.screenshots:
             t = time.time()
-            run_screenshots_scan(output_dir)
+            run_screenshots_scan(output_dir, args.screenshot_delay)
             elapsed = time.time() - t
             run_stats["timings"]["Screenshots scan"] = elapsed
             section_footer("Screenshots scan", elapsed)
